@@ -7,11 +7,13 @@ import (
 	"os"
 	"os/signal"
 	"strconv"
+	"sync/atomic"
 	"syscall"
 	"time"
 )
 
 const requestIDKey = 0
+var healthy int32
 
 func tracing(nextRequestID func() string) func(http.Handler) http.Handler {
     return func(next http.Handler) http.Handler {
@@ -51,7 +53,11 @@ func main() {
     })
 
     http.HandleFunc("GET /healtz", func(w http.ResponseWriter, r *http.Request) {
-        w.WriteHeader(http.StatusNoContent)
+        if atomic.LoadInt32(&healthy) == 1 {
+            w.WriteHeader(http.StatusNoContent)
+            return
+        }
+        w.WriteHeader(http.StatusServiceUnavailable)
     })
 
     nextRequestID := func() string {
@@ -70,9 +76,11 @@ func main() {
     quit := make(chan os.Signal, 1)
     signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 
+    atomic.StoreInt32(&healthy, 1)
     go func() {
         <-quit 
         logger.Printf("server is shutting down...\n")
+        atomic.StoreInt32(&healthy, 0)
 
         ctx, cancel := context.WithTimeout(context.Background(), 30 * time.Second)
         defer cancel()
