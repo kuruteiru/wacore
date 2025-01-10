@@ -65,7 +65,7 @@ func main() {
 		return strconv.FormatInt(time.Now().UnixNano(), 10)
 	}
 
-	server := http.Server{
+	server := &http.Server{
 		Addr:         ":8080",
 		Handler:      tracing(nextRequestID)(logging(logger)(http.DefaultServeMux)),
 		ReadTimeout:  5 * time.Second,
